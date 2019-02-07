@@ -9,22 +9,27 @@ from selenium import webdriver
 from time import sleep
 import numpy as np
 import pandas as pd
+import requests
+import re
 
 url = 'https://www.gofundme.com/discover'
-driver = webdriver.Chrome('C:/webdriver/chromedriver.exe')
+driver = webdriver.Chrome('C:/Drivers/chromedriver.exe')#'C:/webdriver/chromedriver.exe')
 driver.get(url)
-for elem in driver.find_elements_by_link_text('Show all categories'):
+'''for elem in driver.find_elements_by_link_text('Show all categories'):
         try:
             elem.click()
             print('Succesful click')
         except:
             print('Unsuccesful click')
-            
-source = driver.page_source
+'''   
+#source = driver.page_source
 
 driver.close()
+s = requests.get("https://www.gofundme.com/discover")
+soup = BeautifulSoup(s.text, "lxml")
+#print(soup.prettify())
 
-soup = BeautifulSoup(source, 'lxml')
+#soup = BeautifulSoup(source, 'lxml')
 cat_containers = soup.findAll("div", {"class": "section-categories grid-x small-up-2 medium-up-3 large-up-6"})
 categories = cat_containers[0].text #contains category names for this section
 categories = categories.splitlines()
@@ -41,21 +46,22 @@ categories_urls = list(map(lambda x:{x:'https://www.gofundme.com/discover/{}-fun
 
 #process to extract individual gofundme urls from an individual category
 
-
-
-mydf = pd.read_csv('GFM_url_list.csv', sep = '\t')
+mydf = pd.read_csv('../data-raw/GFM_url_list.csv', sep = '\t')
 
 headers = ["Url", "Category","Position", "Title", "Location","Amount_Raised", "Goal", "Number_of_Donators", "Length_of_Fundraising", "FB_Shares", "GFM_hearts", "Text"]
 mydf = mydf.reindex(columns = headers)
 
 full_df = pd.DataFrame(columns = headers)
+#print(mydf.head())
 
 def extract_urls_from_categories(url, MoreGFMclicks = 5):
     
     # eg. url = 'https://www.gofundme.com/discover/medical-fundraiser'
-    driver = webdriver.Chrome('C:/webdriver/chromedriver.exe')
+    driver = webdriver.Chrome('C:/Drivers/chromedriver.exe')
     driver.get(url)
-    
+    #s = requests.get(url)
+    #soup = BeautifulSoup(s.text, "lxml")
+
     for i in range(MoreGFMclicks):
         for elem in driver.find_elements_by_link_text('Show More'):
             try:
@@ -63,8 +69,9 @@ def extract_urls_from_categories(url, MoreGFMclicks = 5):
                 print('Succesful click %s' %(i+1))#make this more useful- say what category it is e.g. url.get_category()
             except:
                 print('Unsuccesful click %s' %(i+1))
-                
-            sleep(0.8) #longer delay - more succesful
+                traceback.print_exc()
+            sleep(0.8) #longer delay - more successful
+        print(i)
             
     source = driver.page_source
         
@@ -89,12 +96,17 @@ def extract_urls_from_categories(url, MoreGFMclicks = 5):
 
 #generate lists of list of URL per category
 
-def list_urls(MoreGFMclicks = 5):
+def list_urls(MoreGFMclicks = 5, only_medical = True):
     GFM_urls = []
-    for url_pair in categories_urls:
-        category = list(url_pair.keys())[0]
-        url = list(url_pair.values())[0]
-        GFM_urls.append([extract_urls_from_categories(url, MoreGFMclicks = 5), category])#get category from categories_urls
+    if only_medical == True:
+        category = list(categories_urls[0].keys())[0]
+        url = list(categories_urls[0].values())[0]
+        GFM_urls.append([extract_urls_from_categories(url, MoreGFMclicks = 20), category])
+    else:
+        for url_pair in categories_urls:
+            category = list(url_pair.keys())[0]
+            url = list(url_pair.values())[0]
+            GFM_urls.append([extract_urls_from_categories(url, MoreGFMclicks = 5), category])#get category from categories_urls
     print("All done!")
     return(GFM_urls)
 
